@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev プレイグラウンド</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #fff; --ink: #1d1c1a; --muted: #6b6860; --line: #e2dfd6;
+    --accent: #2f5d8a; --hot: #b4432f; --choice: #2f5d8a; --score: #7a4f9a; --noul: #3f7a4f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171716; --panel: #212120; --ink: #ecebe6; --muted: #9c998f; --line: #34332f;
+      --accent: #7fa8d1; --hot: #e07a64; --choice: #7fa8d1; --score: #b99ad6; --noul: #7cb58a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, "Hiragino Sans", sans-serif; }
+  main { max-width: 1200px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  input, textarea { font: inherit; font-size: 14px; width: 100%; padding: 6px 8px; border: 1px solid var(--line);
+    border-radius: 6px; background: var(--bg); color: var(--ink); }
+  textarea { resize: vertical; min-height: 60px; }
+  #state { min-height: 120px; font-family: ui-monospace, Menlo, monospace; font-size: 13px; }
+  button { font: inherit; font-size: 14px; border: 0; border-radius: 6px; padding: 6px 12px; background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button.icon { background: transparent; color: var(--muted); padding: 2px 8px; border: 1px solid transparent; }
+  button.icon:hover { border-color: var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .note { font-size: 12px; color: var(--muted); }
+  .err { color: var(--hot); font-size: 13px; }
+  .q { border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .q.choice { --c: var(--choice); } .q.score { --c: var(--score); } .q.noul { --c: var(--noul); }
+  .badge { font-size: 12px; font-weight: 600; color: var(--c); border: 1px solid var(--c); border-radius: 99px; padding: 0 8px; white-space: nowrap; }
+  .qhead { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+  .qhead input { font-family: ui-monospace, Menlo, monospace; }
+  .field { margin-top: 8px; }
+  .field > label { font-size: 12px; color: var(--muted); display: block; margin-bottom: 2px; }
+  .opt { display: grid; grid-template-columns: 140px 1fr auto; gap: 6px; margin-bottom: 6px; align-items: center; }
+  .opt.lv { grid-template-columns: 24px 1fr auto auto auto; }
+  .opt.lv span { text-align: right; font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .opt input.key { font-family: ui-monospace, Menlo, monospace; }
+  .result { border: 1px solid var(--line); border-left: 4px solid var(--c); border-radius: 8px; padding: 12px; margin-bottom: 12px; }
+  .result.choice { --c: var(--choice); } .result.score { --c: var(--score); } .result.noul { --c: var(--noul); }
+  .big { font-size: 22px; font-weight: 700; font-variant-numeric: tabular-nums; }
+  .bar { display: grid; grid-template-columns: minmax(80px, 38%) 1fr 44px; gap: 8px; align-items: center; font-size: 13px; margin: 3px 0; }
+  .bar .lab { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bar.win .lab { font-weight: 700; }
+  .track { height: 8px; background: var(--line); border-radius: 4px; overflow: hidden; position: relative; }
+  .fill { height: 100%; background: var(--c); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .scale { position: relative; height: 10px; background: var(--line); border-radius: 5px; margin: 10px 0 4px; }
+  .scale .dot { position: absolute; top: 50%; width: 16px; height: 16px; margin: -8px 0 0 -8px; border-radius: 50%; background: var(--c); border: 2px solid var(--panel); }
+  .scale-ends { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); gap: 12px; }
+  details { font-size: 12px; margin-top: 8px; } pre { overflow: auto; background: var(--bg); padding: 8px; border-radius: 6px; max-height: 360px; margin: 6px 0 0; }
+  .sticky { position: sticky; top: 12px; }
+  @media (max-width: 860px) { .sticky { position: static; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Jev プレイグラウンド</h1>
+  <p class="sub">入力文と質問を組み立てて、Jevの答えを確かめる。質問はまとめて1回のリクエストで送るので、互いの答えは見えない。Jevは日本語も読めるが、精度は英語のほうが高い。</p>
+
+  <div class="layout">
+    <div>
+      <section>
+        <h2>入力文</h2>
+        <textarea id="state" placeholder="Jevに判断させたい文章。JSONとして読める場合はJSONのまま送る"></textarea>
+        <div id="statekind" class="note"></div>
+      </section>
+
+      <section>
+        <h2>質問</h2>
+        <div id="questions"></div>
+        <div class="row">
+          <button class="ghost" data-add="choice">＋ 選択</button>
+          <button class="ghost" data-add="score">＋ 段階評価</button>
+          <button class="ghost" data-add="noul">＋ はい・いいえ</button>
+        </div>
+      </section>
+
+      <div class="row">
+        <button id="run">Jevに聞く</button>
+        <button id="example" class="ghost">例を読み込む</button>
+        <button id="clear" class="ghost">全部消す</button>
+        <span id="runstatus" class="note"></span>
+      </div>
+      <div id="error" class="err" style="margin-top:8px"></div>
+    </div>
+
+    <div class="sticky">
+      <section>
+        <h2>結果 <span id="meta" class="note" style="font-weight:400"></span></h2>
+        <div id="results" class="note">まだ聞いていない</div>
+        <div id="raw"></div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const STORE = "jev-playground-ja";
+// 画面の表記。APIに送る type は choice, score, noul のまま
+const TYPE_LABEL = { choice: "選択", score: "段階評価", noul: "はい・いいえ" };
+
+const blank = {
+  choice: () => ({ type: "choice", id: "", instructions: "", options: [{ key: "", desc: "" }, { key: "", desc: "" }] }),
+  score: () => ({ type: "score", id: "", instructions: "", levels: ["", "", ""] }),
+  noul: () => ({ type: "noul", id: "", instructions: "", t: "", f: "" }),
+};
+
+const EXAMPLE = {
+  state: "3ヶ月連続で二重請求されています。何度問い合わせても返事がないし、もう限界です。返金してもらえないなら他社に乗り換えます。",
+  questions: [
+    { type: "choice", id: "担当チーム", instructions: "このお客さんのメッセージはどのチームが対応すべきか",
+      options: [
+        { key: "請求", desc: "支払い、請求書、課金、返金" },
+        { key: "技術", desc: "不具合、エラー、障害、外部サービスとの連携" },
+        { key: "アカウント", desc: "ログイン、パスワード、アカウント設定" },
+        { key: "その他", desc: "上のどのチームにも当てはまらないもの" },
+      ] },
+    { type: "score", id: "苛立ち", instructions: "お客さんはサービスに対してどのくらい苛立っているか",
+      levels: ["落ち着いていて丁寧。質問や報告をしているだけ", "不満や失望はあるが、まだ協力的", "怒っていて攻撃的、または我慢の限界に来ている"] },
+    { type: "noul", id: "解約リスク", instructions: "お客さんは解約や他社への乗り換えをほのめかしているか",
+      t: "解約、退会、乗り換えに触れている", f: "離れたいそぶりはない" },
+  ],
+};
+
+let form = load() ?? structuredClone(EXAMPLE);
+
+function load() { try { return JSON.parse(localStorage.getItem(STORE)); } catch { return null; } }
+function save() { try { localStorage.setItem(STORE, JSON.stringify(form)); } catch {} }
+
+// 入力ごとに再描画するとフォーカスが外れるので、構造が変わるときだけ描き直す
+function renderForm() {
+  $("#state").value = form.state;
+  showStateKind();
+  $("#questions").innerHTML = form.questions.map((q, i) => `
+    <div class="q ${q.type}" data-i="${i}">
+      <div class="qhead">
+        <span class="badge" title="${q.type}">${TYPE_LABEL[q.type]}</span>
+        <input data-f="id" value="${esc(q.id)}" placeholder="質問の名前。例: 担当チーム">
+        <button class="icon" data-act="up" title="上へ" ${i === 0 ? "disabled" : ""}>↑</button>
+        <button class="icon" data-act="down" title="下へ" ${i === form.questions.length - 1 ? "disabled" : ""}>↓</button>
+        <button class="icon" data-act="del" title="削除">✕</button>
+      </div>
+      <div class="field"><label>指示: 何を判断させるか</label>
+        <textarea data-f="instructions" rows="2">${esc(q.instructions)}</textarea></div>
+      ${criteriaEditor(q)}
+    </div>`).join("") || `<p class="note">質問がない。下のボタンから足す</p>`;
+}
+
+function criteriaEditor(q) {
+  if (q.type === "choice") return `<div class="field"><label>選択肢: 名前と、その選択肢が意味すること</label>
+    ${q.options.map((o, j) => `<div class="opt">
+      <input class="key" data-o="${j}" data-k="key" value="${esc(o.key)}" placeholder="名前">
+      <input data-o="${j}" data-k="desc" value="${esc(o.desc)}" placeholder="この選択肢が意味すること">
+      <button class="icon" data-act="odel" data-j="${j}" title="削除" ${q.options.length <= 2 ? "disabled" : ""}>✕</button></div>`).join("")}
+    <button class="ghost" data-act="oadd">＋ 選択肢</button></div>`;
+  if (q.type === "score") return `<div class="field"><label>段階: 上が低く、下が高い。2〜10段階</label>
+    ${q.levels.map((l, j) => `<div class="opt lv"><span>${j}</span>
+      <input data-l="${j}" value="${esc(l)}" placeholder="この段階に当たる具体的な状態">
+      <button class="icon" data-act="lup" data-j="${j}" ${j === 0 ? "disabled" : ""}>↑</button>
+      <button class="icon" data-act="ldown" data-j="${j}" ${j === q.levels.length - 1 ? "disabled" : ""}>↓</button>
+      <button class="icon" data-act="ldel" data-j="${j}" ${q.levels.length <= 2 ? "disabled" : ""}>✕</button></div>`).join("")}
+    <button class="ghost" data-act="ladd" ${q.levels.length >= 10 ? "disabled" : ""}>＋ 段階</button></div>`;
+  return `<div class="field"><label>「はい」のとき</label><input data-f="t" value="${esc(q.t)}" placeholder="条件が成り立つとはどういうことか"></div>
+    <div class="field"><label>「いいえ」のとき</label><input data-f="f" value="${esc(q.f)}" placeholder="成り立たないとはどういうことか"></div>`;
+}
+
+function parseState() {
+  const raw = form.state.trim();
+  if (/^[\[{]/.test(raw)) { try { return { value: JSON.parse(raw), json: true }; } catch {} }
+  return { value: form.state, json: false };
+}
+function showStateKind() {
+  const s = parseState();
+  $("#statekind").textContent = form.state.trim() ? (s.json ? "JSONとして送る" : "テキストとして送る") : "";
+}
+
+$("#state").addEventListener("input", (e) => { form.state = e.target.value; showStateKind(); save(); });
+
+$("#questions").addEventListener("input", (e) => {
+  const q = form.questions[e.target.closest(".q").dataset.i];
+  const d = e.target.dataset;
+  if (d.f) q[d.f] = e.target.value;
+  else if (d.o !== undefined) q.options[d.o][d.k] = e.target.value;
+  else if (d.l !== undefined) q.levels[d.l] = e.target.value;
+  save();
+});
+
+$("#questions").addEventListener("click", (e) => {
+  const b = e.target.closest("button[data-act]");
+  if (!b) return;
+  const i = Number(b.closest(".q").dataset.i), q = form.questions[i], j = Number(b.dataset.j);
+  const swap = (arr, a, c) => ([arr[a], arr[c]] = [arr[c], arr[a]]);
+  ({
+    up: () => swap(form.questions, i, i - 1),
+    down: () => swap(form.questions, i, i + 1),
+    del: () => form.questions.splice(i, 1),
+    oadd: () => q.options.push({ key: "", desc: "" }),
+    odel: () => q.options.splice(j, 1),
+    ladd: () => q.levels.push(""),
+    ldel: () => q.levels.splice(j, 1),
+    lup: () => swap(q.levels, j, j - 1),
+    ldown: () => swap(q.levels, j, j + 1),
+  })[b.dataset.act]();
+  save(); renderForm();
+});
+
+document.querySelectorAll("[data-add]").forEach((b) => b.onclick = () => {
+  const q = blank[b.dataset.add]();
+  q.id = `${TYPE_LABEL[b.dataset.add]}${form.questions.filter((x) => x.type === b.dataset.add).length + 1}`;
+  form.questions.push(q); save(); renderForm();
+});
+$("#example").onclick = () => { form = structuredClone(EXAMPLE); save(); renderForm(); };
+$("#clear").onclick = () => { form = { state: "", questions: [] }; save(); renderForm(); };
+
+function buildRequest() {
+  const errors = [];
+  if (!form.state.trim()) errors.push("入力文が空");
+  if (!form.questions.length) errors.push("質問が1つもない");
+  const ids = new Set(), questions = {};
+  for (const [n, q] of form.questions.entries()) {
+    const at = `${n + 1}番目の質問`;
+    const id = q.id.trim();
+    if (!id) { errors.push(`${at}の名前が空`); continue; }
+    if (ids.has(id)) errors.push(`質問の名前「${id}」が重複している`);
+    ids.add(id);
+    if (!q.instructions.trim()) errors.push(`${id}の指示が空`);
+    let criteria;
+    if (q.type === "choice") {
+      const opts = q.options.filter((o) => o.key.trim() || o.desc.trim());
+      if (opts.length < 2) errors.push(`${id}の選択肢は2つ以上必要`);
+      if (opts.some((o) => !o.key.trim())) errors.push(`${id}に名前が空の選択肢がある`);
+      if (new Set(opts.map((o) => o.key.trim())).size !== opts.length) errors.push(`${id}の選択肢の名前が重複している`);
+      criteria = Object.fromEntries(opts.map((o) => [o.key.trim(), o.desc.trim()]));
+    } else if (q.type === "score") {
+      criteria = q.levels.map((l) => l.trim()).filter(Boolean);
+      if (criteria.length < 2) errors.push(`${id}の段階は2つ以上必要`);
+    } else {
+      if (!q.t.trim() || !q.f.trim()) errors.push(`${id}の「はい」と「いいえ」の説明を両方書く`);
+      criteria = { true: q.t.trim(), false: q.f.trim() };
+    }
+    questions[id] = { type: q.type, instructions: q.instructions.trim(), criteria };
+  }
+  return { errors, body: { state: parseState().value, questions } };
+}
+
+const bar = (label, v, win) => `<div class="bar${win ? " win" : ""}"><span class="lab" title="${esc(label)}">${esc(label)}</span><div class="track"><div class="fill" style="width:${(v * 100).toFixed(1)}%"></div></div><span class="num">${v.toFixed(2)}</span></div>`;
+
+function renderResult(id, a, q) {
+  if (a.type === "noul") return `<div class="result noul"><h2><span class="badge">${TYPE_LABEL.noul}</span>${esc(id)}</h2>
+    <div class="big">${a.noul.toFixed(2)}</div>
+    <div class="note">「はい」である確率。${esc(q.criteria.true)}</div>
+    ${bar("はい", a.noul, a.noul >= 0.5)}${bar("いいえ", 1 - a.noul, a.noul < 0.5)}</div>`;
+  if (a.type === "choice") {
+    const rows = Object.entries(a.probabilities).sort((x, y) => y[1] - x[1]);
+    return `<div class="result choice"><h2><span class="badge">${TYPE_LABEL.choice}</span>${esc(id)}</h2>
+      <div class="big">${esc(a.choice)}</div>
+      <div class="note">確信度 ${a.confidence.toFixed(2)}　${esc(q.criteria[a.choice] ?? "")}</div>
+      ${rows.map(([k, v]) => bar(k, v, k === a.choice)).join("")}</div>`;
+  }
+  const n = Object.keys(a.legend).length - 1;
+  const top = Object.entries(a.probabilities).sort((x, y) => y[1] - x[1])[0][0];
+  return `<div class="result score"><h2><span class="badge">${TYPE_LABEL.score}</span>${esc(id)}</h2>
+    <div class="big">${a.score.toFixed(2)} <span class="note">/ ${n}</span></div>
+    <div class="note">確信度 ${a.confidence.toFixed(2)}　一番近い段階: ${esc(a.legend[Math.round(a.score)])}</div>
+    <div class="scale"><div class="dot" style="left:${(a.score / n) * 100}%"></div></div>
+    <div class="scale-ends"><span>${esc(a.legend[0])}</span><span style="text-align:right">${esc(a.legend[n])}</span></div>
+    <div style="margin-top:8px">${Object.entries(a.legend).map(([k, l]) => bar(`${k}: ${l}`, a.probabilities[k] ?? 0, k === top)).join("")}</div></div>`;
+}
+
+$("#run").onclick = async () => {
+  $("#error").textContent = "";
+  const { errors, body } = buildRequest();
+  if (errors.length) { $("#error").innerHTML = errors.map(esc).join("<br>"); return; }
+  $("#run").disabled = true; $("#runstatus").textContent = "Jevが判断している…";
+  try {
+    const res = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? res.statusText);
+    const u = data.response.usage;
+    $("#meta").textContent = `${data.latency_ms}ms${u ? `　入力${u.input_tokens}トークン　出力${u.output_tokens}トークン` : ""}`;
+    $("#results").innerHTML = Object.entries(data.answers).map(([id, a]) => renderResult(id, a, body.questions[id])).join("");
+    $("#raw").innerHTML =
+      `<details><summary>リクエスト</summary><pre>POST https://api.typesafe.ai/v1/systemone\n${esc(JSON.stringify(data.request, null, 2))}</pre></details>` +
+      `<details><summary>レスポンス</summary><pre>${esc(JSON.stringify(data.response, null, 2))}</pre></details>`;
+  } catch (e) {
+    $("#error").textContent = e.message;
+  } finally {
+    $("#run").disabled = false; $("#runstatus").textContent = "";
+  }
+};
+
+renderForm();
+</script>
+</body>
+</html>

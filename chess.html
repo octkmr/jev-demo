@@ -1,0 +1,240 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Jev チェス</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #fff; --ink: #1d1c1a; --muted: #6b6860; --line: #e2dfd6;
+    --accent: #2f5d8a; --hot: #b4432f; --light: #eeddc0; --dark: #b58863; --sel: #f2cf5b; --last: #cdd26a;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #171716; --panel: #212120; --ink: #ecebe6; --muted: #9c998f; --line: #34332f;
+      --accent: #7fa8d1; --hot: #e07a64; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.6 system-ui, "Hiragino Sans", sans-serif; }
+  main { max-width: 1000px; margin: 0 auto; padding: 24px 16px 64px; }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .layout { display: grid; grid-template-columns: auto 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 820px) { .layout { grid-template-columns: 1fr; } }
+  .boardwrap { display: flex; gap: 8px; }
+  .evalbar { width: 14px; border-radius: 4px; overflow: hidden; background: #2b2a28; display: flex; flex-direction: column; justify-content: flex-end; }
+  .evalbar div { background: #f3f1ea; transition: height .4s; }
+  .board { display: grid; grid-template-columns: repeat(8, min(60px, 11vw)); grid-template-rows: repeat(8, min(60px, 11vw));
+    border: 2px solid #6b5640; border-radius: 4px; overflow: hidden; user-select: none; }
+  .sq { display: flex; align-items: center; justify-content: center; font-size: min(44px, 8vw); line-height: 1; cursor: pointer; position: relative; color: #111; }
+  .sq.l { background: var(--light); } .sq.d { background: var(--dark); }
+  .sq.last { box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--last) 55%, transparent); }
+  .sq.sel { box-shadow: inset 0 0 0 100px color-mix(in srgb, var(--sel) 70%, transparent); }
+  .sq.target::after { content: ""; width: 26%; height: 26%; border-radius: 50%; background: rgba(0,0,0,.25); position: absolute; }
+  .sq.target.cap::after { width: 86%; height: 86%; background: transparent; border: 4px solid rgba(0,0,0,.25); }
+  .sq.check { background: radial-gradient(circle, #e8584a 0%, transparent 75%), var(--dark); }
+  .sq .co { position: absolute; font-size: 10px; color: rgba(0,0,0,.45); }
+  .sq .co.f { right: 3px; bottom: 1px; } .sq .co.r { left: 3px; top: 1px; }
+  .piece-w { color: #fff; -webkit-text-stroke: 1.2px #222; } .piece-b { color: #111; }
+  section { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; margin-bottom: 14px; }
+  h2 { font-size: 14px; margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+  #status { font-weight: 600; }
+  .err { color: var(--hot); font-size: 13px; }
+  button { font: inherit; border: 0; border-radius: 6px; padding: 6px 12px; background: var(--accent); color: #fff; cursor: pointer; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--line); }
+  button:disabled { opacity: .5; cursor: default; }
+  .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .bar { display: grid; grid-template-columns: 70px 1fr 44px; gap: 8px; align-items: center; font-size: 13px; margin: 3px 0; }
+  .track { height: 6px; background: var(--line); border-radius: 3px; overflow: hidden; }
+  .fill { height: 100%; background: var(--accent); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; color: var(--muted); }
+  .note { font-size: 12px; color: var(--muted); }
+  #moves { font-variant-numeric: tabular-nums; font-size: 13px; max-height: 180px; overflow-y: auto; }
+  details { font-size: 12px; } pre { overflow-x: auto; background: var(--bg); padding: 8px; border-radius: 6px; max-height: 260px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Jev チェス</h1>
+  <p class="sub">あなたが白、Jevが黒。合法手の生成と各手の事実はコードが出し、Jevはその中から1手を選ぶ。探索はしないので、読みではなく局面の直感で指している。</p>
+  <div class="layout">
+    <div class="boardwrap">
+      <div class="evalbar" title="Jevの形勢判断"><div id="evalw" style="height:50%"></div></div>
+      <div id="board" class="board"></div>
+    </div>
+    <div>
+      <section>
+        <div id="status">あなたの番</div>
+        <div id="error" class="err"></div>
+        <div class="row">
+          <button id="newgame" class="ghost">新しい対局</button>
+          <button id="undo" class="ghost">1手戻す</button>
+          <button id="retry" style="display:none">Jevに指させる</button>
+        </div>
+      </section>
+      <section>
+        <h2>Jevの判断</h2>
+        <div id="think" class="note">まだ指していない</div>
+      </section>
+      <section>
+        <h2>棋譜</h2>
+        <div id="moves" class="note">-</div>
+      </section>
+    </div>
+  </div>
+</main>
+
+<script type="module">
+import { Chess } from "https://cdn.jsdelivr.net/npm/chess.js@1.4.0/+esm";
+
+const PLAYER = "w", JEV = "b";
+const GLYPH = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟" };
+const NAME = { k: "king", q: "queen", r: "rook", b: "bishop", n: "knight", p: "pawn" };
+const VALUE = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+const FILES = "abcdefgh";
+const $ = (s) => document.querySelector(s);
+
+let game = new Chess();
+let selected = null;
+let thinking = false;
+let lastMove = null;
+
+const uci = (m) => m.from + m.to + (m.promotion ?? "");
+
+// 盤面から計算で分かる事実を手ごとに添える。判断はJevに任せる
+function describeMoves() {
+  return game.moves({ verbose: true }).map((m) => {
+    const after = new Chess(m.after);
+    const facts = { move: m.san, piece: NAME[m.piece], from: m.from, to: m.to };
+    if (m.captured) facts.captures = NAME[m.captured];
+    if (m.promotion) facts.promotes_to = NAME[m.promotion];
+    if (m.flags.includes("k")) facts.castles = "kingside";
+    if (m.flags.includes("q")) facts.castles = "queenside";
+    if (after.isCheckmate()) facts.delivers_checkmate = true;
+    else if (after.inCheck()) facts.gives_check = true;
+    if (after.isStalemate()) facts.causes_stalemate_draw = true;
+    const recaptures = after.moves({ verbose: true }).filter((r) => r.to === m.to);
+    facts.moved_piece_can_be_captured = recaptures.length > 0;
+    if (recaptures.length) facts.cheapest_attacker = NAME[recaptures.reduce((a, b) => (VALUE[a.piece] <= VALUE[b.piece] ? a : b)).piece];
+    return { uci: uci(m), ...facts };
+  });
+}
+
+function material() {
+  const t = { white: 0, black: 0 };
+  for (const row of game.board()) for (const p of row) if (p) t[p.color === "w" ? "white" : "black"] += VALUE[p.type];
+  return t;
+}
+
+function pgnText() {
+  const h = game.history();
+  return h.reduce((s, san, i) => s + (i % 2 === 0 ? `${i / 2 + 1}. ` : "") + san + " ", "").trim();
+}
+
+function render() {
+  const el = $("#board");
+  el.innerHTML = "";
+  const targets = selected ? game.moves({ square: selected, verbose: true }) : [];
+  const checkSq = game.inCheck() ? findKing(game.turn()) : null;
+  for (let r = 7; r >= 0; r--) for (let f = 0; f < 8; f++) {
+    const sq = FILES[f] + (r + 1);
+    const p = game.get(sq);
+    const d = document.createElement("div");
+    d.className = `sq ${(r + f) % 2 ? "l" : "d"}`;
+    if (lastMove && (sq === lastMove.from || sq === lastMove.to)) d.classList.add("last");
+    if (sq === selected) d.classList.add("sel");
+    if (sq === checkSq) d.classList.add("check");
+    const t = targets.find((m) => m.to === sq);
+    if (t) { d.classList.add("target"); if (t.captured) d.classList.add("cap"); }
+    if (p) d.innerHTML = `<span class="piece-${p.color}">${GLYPH[p.type]}</span>`;
+    if (f === 0) d.innerHTML += `<span class="co r">${r + 1}</span>`;
+    if (r === 0) d.innerHTML += `<span class="co f">${FILES[f]}</span>`;
+    d.onclick = () => clickSquare(sq);
+    el.appendChild(d);
+  }
+  $("#moves").textContent = pgnText() || "-";
+  $("#status").textContent = statusText();
+  $("#undo").disabled = thinking || game.history().length === 0;
+}
+
+function findKing(color) {
+  for (const row of game.board()) for (const p of row) if (p?.type === "k" && p.color === color) return p.square;
+}
+
+function statusText() {
+  if (game.isCheckmate()) return game.turn() === PLAYER ? "チェックメイト。Jevの勝ち" : "チェックメイト。あなたの勝ち";
+  if (game.isStalemate()) return "ステイルメイトで引き分け";
+  if (game.isDraw()) return "引き分け";
+  if (thinking) return "Jevが考えている…";
+  return game.turn() === PLAYER ? (game.inCheck() ? "あなたの番。チェックされている" : "あなたの番") : "Jevの番";
+}
+
+function clickSquare(sq) {
+  if (thinking || game.isGameOver() || game.turn() !== PLAYER) return;
+  const p = game.get(sq);
+  if (selected) {
+    const m = game.moves({ square: selected, verbose: true }).find((m) => m.to === sq);
+    if (m) {
+      // 成りは常にクイーン
+      lastMove = game.move({ from: m.from, to: m.to, promotion: m.promotion ? "q" : undefined });
+      selected = null;
+      render();
+      jevTurn();
+      return;
+    }
+  }
+  selected = p && p.color === PLAYER && sq !== selected ? sq : null;
+  render();
+}
+
+async function jevTurn() {
+  if (game.isGameOver() || game.turn() !== JEV) return;
+  thinking = true; $("#error").textContent = ""; $("#retry").style.display = "none"; render();
+  const moves = describeMoves();
+  const state = {
+    jev_plays: "black",
+    position_fen: game.fen(),
+    board_diagram: game.ascii(),
+    moves_so_far: pgnText(),
+    opponent_last_move: game.history().at(-1) ?? null,
+    black_king_in_check: game.inCheck(),
+    material_points: material(),
+  };
+  try {
+    const res = await fetch("/api/chess", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ state, moves }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error ?? res.statusText);
+    const pick = data.answers.move.choice;
+    const m = game.moves({ verbose: true }).find((m) => uci(m) === pick);
+    if (!m) throw new Error(`Jevが合法手以外を返した: ${pick}`);
+    lastMove = game.move(m);
+    showThinking(data, moves);
+  } catch (e) {
+    $("#error").textContent = e.message;
+    $("#retry").style.display = "";
+  } finally {
+    thinking = false; render();
+  }
+}
+
+function showThinking(data, moves) {
+  const { move, evaluation } = data.answers;
+  const san = Object.fromEntries(moves.map((m) => [m.uci, m.move]));
+  const top = Object.entries(move.probabilities).sort((a, b) => b[1] - a[1]).slice(0, 5);
+  // 評価は0が白勝勢、4が黒勝勢。バーは白の取り分を表示
+  const levels = Object.keys(evaluation.legend).length - 1;
+  $("#evalw").style.height = `${((levels - evaluation.score) / levels) * 100}%`;
+  $("#think").innerHTML =
+    `<div>指した手: <b>${san[move.choice]}</b>　確信度 ${move.confidence.toFixed(2)}　合法手 ${moves.length}手　${data.latency_ms}ms</div>` +
+    `<div style="margin-top:6px">${top.map(([k, v]) => `<div class="bar"><span>${san[k] ?? k}</span><div class="track"><div class="fill" style="width:${(v * 100).toFixed(0)}%"></div></div><span class="num">${v.toFixed(2)}</span></div>`).join("")}</div>` +
+    `<div class="note" style="margin-top:6px">形勢判断: ${evaluation.legend[Math.round(evaluation.score)]} (${evaluation.score.toFixed(2)} / ${levels})</div>` +
+    `<details><summary>リクエスト</summary><pre>POST https://api.typesafe.ai/v1/systemone\n${JSON.stringify(data.request, null, 2).replace(/</g, "&lt;")}</pre></details>` +
+    `<details><summary>レスポンス</summary><pre>${JSON.stringify(data.response, null, 2).replace(/</g, "&lt;")}</pre></details>`;
+}
+
+$("#newgame").onclick = () => { if (thinking) return; game = new Chess(); selected = null; lastMove = null; $("#think").textContent = "まだ指していない"; $("#evalw").style.height = "50%"; $("#error").textContent = ""; $("#retry").style.display = "none"; render(); };
+$("#undo").onclick = () => { if (thinking) return; game.undo(); if (game.turn() === JEV) game.undo(); selected = null; lastMove = null; $("#error").textContent = ""; $("#retry").style.display = "none"; render(); };
+$("#retry").onclick = jevTurn;
+render();
+</script>
+</body>
+</html>
