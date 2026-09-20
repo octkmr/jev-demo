@@ -1,7 +1,9 @@
-// ローカル用のサーバー。Vercel上では public/ の静的配信と api/ の関数が同じ役割をする
+// ローカル用のサーバー。Vercel上では public/ の静的配信と api/ の関数が同じ役割をする。
+// ルートに server.mjs があるとVercelがNodeサーバーと判定して全リクエストをここに流すので、
+// 意図的に scripts/ に置いている。ルートへ戻さないこと
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
-import { handleJevRequest, send } from "./lib/jev.mjs";
+import { handleJevRequest, send } from "../lib/jev.mjs";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = "127.0.0.1";
@@ -14,7 +16,7 @@ createServer(async (req, res) => {
     if (!/^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host ?? "")) return send(res, 403, { error: "forbidden" });
     const page = PAGES[req.url];
     if (req.method === "GET" && page) {
-      return send(res, 200, await readFile(new URL(`./public/${page}`, import.meta.url)), "text/html; charset=utf-8");
+      return send(res, 200, await readFile(new URL(`../public/${page}`, import.meta.url)), "text/html; charset=utf-8");
     }
     const kind = ROUTES[req.url];
     if (kind) return await handleJevRequest(req, res, kind);
