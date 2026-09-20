@@ -14,7 +14,9 @@ TypeSafeのJevを試すためのデモ。依存パッケージは無く、Node�
 | `lib/jev.mjs` | Jevの呼び出しと入力チェック。APIキーはここだけで読む |
 | `scripts/dev-server.mjs` | ローカル用のサーバー。上の2つを繋いで1プロセスで出す |
 
-ローカル用サーバーを `scripts/` に置いているのは意図的で、**ルートに `server.mjs` や `app.js` を置くとVercelがNodeサーバーと判定し、静的配信も `api/` も使わずに全リクエストをそのファイルへ流す**。ルートに戻さないこと。
+ローカル用サーバーを `scripts/` に置いているのは意図的で、**ルートに `server.mjs` や `app.js` を置くとVercelのFramework Presetが「Node」と判定され、`api/` を一切ビルドせずに全リクエストをそのファイルへ流す**。ルートに戻さないこと。
+
+判定は一度プロジェクト設定に保存されて残るので、`vercel.json` で `"framework": null` を明示して上書きしている。これを外すと、保存済みの設定次第でビルドが `No entrypoint found` で落ちる。
 
 ## ローカルで動かす
 
