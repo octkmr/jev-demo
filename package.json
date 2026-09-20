@@ -1,0 +1,13 @@
+{
+  "name": "jev-demo",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TypeSafeのJevを試すためのデモ",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": "22.x"
+  }
+}
